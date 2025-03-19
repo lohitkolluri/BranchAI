@@ -16,7 +16,7 @@ import uuid
 import json
 import tempfile
 from pathlib import Path
-import face_recognition
+from deepface import DeepFace
 
 # Set page configuration
 st.set_page_config(
@@ -276,6 +276,41 @@ with st.sidebar:
 
 # Main content based on current step
 st.markdown("<h1 class='main-header'>AI Bank Manager</h1>", unsafe_allow_html=True)
+
+# Function to verify face using deepface library
+def verify_face(image_path, reference_encoding=None):
+    """
+    Verify if the face in the image matches the reference encoding.
+
+    Args:
+        image_path (str): Path to the image file
+        reference_encoding (list, optional): Reference face encoding to compare against
+
+    Returns:
+        tuple: (is_valid_face, face_encoding or confidence score)
+    """
+    try:
+        # Analyze the image
+        result = DeepFace.analyze(img_path=image_path, actions=['embedding'])
+
+        if 'embedding' not in result:
+            return False, None  # No face found
+
+        face_encoding = result['embedding']
+
+        if reference_encoding is None:
+            return True, face_encoding  # Return the encoding if no reference provided
+
+        # Compare the face with the reference encoding
+        distance = np.linalg.norm(np.array(reference_encoding) - np.array(face_encoding))
+        is_same_person = distance < 0.6  # Threshold for face verification
+        confidence = 1 - distance  # Confidence score
+
+        return is_same_person, confidence
+
+    except Exception as e:
+        print(f"Error in face verification: {str(e)}")
+        return False, None
 
 # Step 1: Welcome screen
 if st.session_state.current_step == 1:
@@ -1266,7 +1301,7 @@ elif st.session_state.current_step == 6:
         mime="text/plain"
     )
 
-# Function to verify face using face_recognition library
+# Function to verify face using deepface library
 def verify_face(image_path, reference_encoding=None):
     """
     Verify if the face in the image matches the reference encoding.
@@ -1279,25 +1314,66 @@ def verify_face(image_path, reference_encoding=None):
         tuple: (is_valid_face, face_encoding or confidence score)
     """
     try:
-        # Load the image
-        image = face_recognition.load_image_file(image_path)
-        # Get face encodings
-        face_encodings = face_recognition.face_encodings(image)
+        # Analyze the image
+        result = DeepFace.analyze(img_path=image_path, actions=['embedding'])
 
-        if len(face_encodings) == 0:
+        if 'embedding' not in result:
             return False, None  # No face found
 
-        face_encoding = face_encodings[0]
+        face_encoding = result['embedding']
 
         if reference_encoding is None:
             return True, face_encoding  # Return the encoding if no reference provided
 
         # Compare the face with the reference encoding
-        matches = face_recognition.compare_faces([reference_encoding], face_encoding)
-        confidence = face_recognition.face_distance([reference_encoding], face_encoding)[0]
+        distance = np.linalg.norm(np.array(reference_encoding) - np.array(face_encoding))
+        is_same_person = distance < 0.6  # Threshold for face verification
+        confidence = 1 - distance  # Confidence score
 
-        return matches[0], confidence
+        return is_same_person, confidence
 
     except Exception as e:
         print(f"Error in face verification: {str(e)}")
         return False, None
+
+# Step 1: Welcome screen
+if st.session_state.current_step == 1:
+    st.markdown("<h2 class='sub-header'>Welcome to Virtual Bank Branch</h2>", unsafe_allow_html=True)
+
+    col1, col2 = st.columns([2, 1])
+
+    with col1:
+        st.markdown("""
+        <div class='info-box'>
+            <p>Welcome to our AI-powered banking experience! I am your virtual Bank Manager, ready to assist you with your loan application process.</p>
+            <p>In this session, we'll go through the following steps:</p>
+            <ol>
+                <li>Identity verification through facial recognition</li>
+                <li>Document submission and verification</li>
+                <li>Video interview for loan assessment</li>
+                <li>Instant loan eligibility check</li>
+            </ol>
+            <p>This process is designed to give you a branch-like experience without visiting a physical bank.</p>
+        </div>
+        """, unsafe_allow_html=True)
+
+        # Collect basic information
+        st.markdown("<p>Let's start with your basic information:</p>", unsafe_allow_html=True)
+        name = st.text_input("Full Name", key="name")
+        email = st.text_input("Email Address", key="email")
+        phone = st.text_input("Phone Number", key="phone")
+
+        if st.button("Begin Application Process"):
+            if not name or not email or not phone:
+                st.error("Please fill in all the fields to continue.")
+            else:
+                # Save user data
+                st.session_state.user_data.update({
+                    "name": name,
+                    "email": email,
+                    "phone": phone,
+                    "application_id": f"LOAN-{int(time.time())}",
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
+                })
+                next_step()
+                st.rerun()
