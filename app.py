@@ -9,7 +9,6 @@ import base64
 from io import BytesIO
 
 # Import utility modules
-from utils.facial_verification import verify_face
 from utils.document_processor import process_document, extract_document_info, get_document_requirements, detect_document_boundaries, draw_document_boundaries, extract_document, is_document_clear
 from utils.loan_eligibility import check_eligibility
 import qrcode
@@ -17,6 +16,7 @@ import uuid
 import json
 import tempfile
 from pathlib import Path
+import face_recognition
 
 # Set page configuration
 st.set_page_config(
@@ -1265,3 +1265,39 @@ elif st.session_state.current_step == 6:
         file_name=f"loan_application_{st.session_state.user_data.get('application_id', 'summary')}.txt",
         mime="text/plain"
     )
+
+# Function to verify face using face_recognition library
+def verify_face(image_path, reference_encoding=None):
+    """
+    Verify if the face in the image matches the reference encoding.
+
+    Args:
+        image_path (str): Path to the image file
+        reference_encoding (list, optional): Reference face encoding to compare against
+
+    Returns:
+        tuple: (is_valid_face, face_encoding or confidence score)
+    """
+    try:
+        # Load the image
+        image = face_recognition.load_image_file(image_path)
+        # Get face encodings
+        face_encodings = face_recognition.face_encodings(image)
+
+        if len(face_encodings) == 0:
+            return False, None  # No face found
+
+        face_encoding = face_encodings[0]
+
+        if reference_encoding is None:
+            return True, face_encoding  # Return the encoding if no reference provided
+
+        # Compare the face with the reference encoding
+        matches = face_recognition.compare_faces([reference_encoding], face_encoding)
+        confidence = face_recognition.face_distance([reference_encoding], face_encoding)[0]
+
+        return matches[0], confidence
+
+    except Exception as e:
+        print(f"Error in face verification: {str(e)}")
+        return False, None
