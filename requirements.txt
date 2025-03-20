@@ -3,7 +3,6 @@ opencv-python
 numpy
 pillow
 pandas
-face-recognition
 pytesseract
 python-dotenv
 pydub
