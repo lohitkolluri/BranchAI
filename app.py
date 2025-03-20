@@ -9,6 +9,7 @@ import base64
 from io import BytesIO
 
 # Import utility modules
+from utils.facial_verification import verify_face
 from utils.document_processor import process_document, extract_document_info, get_document_requirements, detect_document_boundaries, draw_document_boundaries, extract_document, is_document_clear
 from utils.loan_eligibility import check_eligibility
 import qrcode
@@ -16,7 +17,6 @@ import uuid
 import json
 import tempfile
 from pathlib import Path
-from deepface import DeepFace
 
 # Set page configuration
 st.set_page_config(
@@ -272,45 +272,9 @@ with st.sidebar:
 
     if st.button("Start Over"):
         reset_app()
-        st.rerun()()
 
 # Main content based on current step
 st.markdown("<h1 class='main-header'>AI Bank Manager</h1>", unsafe_allow_html=True)
-
-# Function to verify face using deepface library
-def verify_face(image_path, reference_encoding=None):
-    """
-    Verify if the face in the image matches the reference encoding.
-
-    Args:
-        image_path (str): Path to the image file
-        reference_encoding (list, optional): Reference face encoding to compare against
-
-    Returns:
-        tuple: (is_valid_face, face_encoding or confidence score)
-    """
-    try:
-        # Analyze the image
-        result = DeepFace.analyze(img_path=image_path, actions=['embedding'])
-
-        if 'embedding' not in result:
-            return False, None  # No face found
-
-        face_encoding = result['embedding']
-
-        if reference_encoding is None:
-            return True, face_encoding  # Return the encoding if no reference provided
-
-        # Compare the face with the reference encoding
-        distance = np.linalg.norm(np.array(reference_encoding) - np.array(face_encoding))
-        is_same_person = distance < 0.6  # Threshold for face verification
-        confidence = 1 - distance  # Confidence score
-
-        return is_same_person, confidence
-
-    except Exception as e:
-        print(f"Error in face verification: {str(e)}")
-        return False, None
 
 # Step 1: Welcome screen
 if st.session_state.current_step == 1:
@@ -352,7 +316,6 @@ if st.session_state.current_step == 1:
                     "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
                 })
                 next_step()
-                st.rerun()
 
     with col2:
         st.video("https://sora.com/g/gen_01jpn3fq0ye6srrmjzeg8jv8jn")
@@ -412,13 +375,11 @@ elif st.session_state.current_step == 2:
                 if st.button("Retake Photo"):
                     st.session_state.face_verified = False
                     st.session_state.face_capture_active = True
-                    st.rerun()
 
         # Continue button shown below the camera or image
         if st.session_state.face_verified:
             if st.button("Continue to Document Submission"):
                 next_step()
-                st.rerun()
 
     with col2:
         st.video("https://sora.com/g/gen_01jpn3fq0ye6srrmjzeg8jv8jn")
@@ -491,7 +452,6 @@ elif st.session_state.current_step == 3:
             if st.button("Retake Photo", key=f"retake_{key}"):
                 st.session_state[f"document_captured_{key}"] = None
                 st.session_state[f"detection_active_{key}"] = True
-                st.rerun()
 
             return captured_img
 
@@ -551,7 +511,6 @@ elif st.session_state.current_step == 3:
                         st.session_state[f"last_capture_{key}"] = current_time
 
                         st.success("Document detected and captured! Processing...")
-                        st.rerun()
 
                     # Show guidance based on detection
                     if not is_clear:
@@ -584,8 +543,13 @@ elif st.session_state.current_step == 3:
         # Use localhost URL for local testing with proper multi-page app path
         # The "mobile_upload" becomes "Mobile_upload" in the URL (first letter capitalized)
         # This is how Streamlit formats page names in the URL
-        base_url = "http://192.168.1.2:8501"
-        upload_url = f"{base_url}/mobile_upload?id={upload_id}&type={doc_type}"
+        base_url = "http://localhost:8501"
+        upload_url = f"{base_url}/Mobile_upload?id={upload_id}&type={doc_type}"
+
+        # For running on a local network, use your computer's IP address
+        # You can uncomment and modify this line with your actual IP address
+        # base_url = "http://192.168.1.xxx:8501"  # Replace with your actual IP address
+        # upload_url = f"{base_url}/Mobile_upload?id={upload_id}&type={doc_type}"
 
         # Generate QR code with better error correction for mobile scanning
         qr = qrcode.QRCode(
@@ -744,7 +708,7 @@ elif st.session_state.current_step == 3:
                 else:
                     st.error(f"❌ {validation_result['message']}")
 
-        # Mobile Upload via QR Code
+        # Tab 3: Mobile Upload via QR Code
         with mobile_tab:
             st.markdown("""
             <div class='info-box'>
@@ -896,7 +860,6 @@ elif st.session_state.current_step == 3:
     with col1:
         if st.button("Go Back"):
             prev_step()
-            st.rerun()
 
     with col2:
         # Check document status
@@ -913,7 +876,6 @@ elif st.session_state.current_step == 3:
         if st.button("Continue to Loan Interview"):
             if all(mandatory_docs.values()):
                 next_step()
-                st.rerun()
             else:
                 missing_docs = [doc_names[doc] for doc, status in mandatory_docs.items() if not status]
                 st.error(f"Please upload and verify the following mandatory documents: {', '.join(missing_docs)}")
@@ -1001,7 +963,6 @@ elif st.session_state.current_step == 4:
                         st.success(f"Identity verified! (Confidence: {confidence:.2f}%)")
                         st.session_state.question_verified = True
                         # Rerun to update UI and show video recording option
-                        st.rerun()
                     else:
                         st.error(f"Identity verification failed. Please try again. (Confidence: {confidence:.2f}%)")
 
@@ -1031,7 +992,7 @@ elif st.session_state.current_step == 4:
 
                     # If there are more questions, rerun to show the next question
                     if st.session_state.current_question_index < len(questions):
-                        st.rerun()
+                        pass
 
             # Progress indicator
             question_progress = (current_q + 1) / len(questions)
@@ -1062,7 +1023,6 @@ elif st.session_state.current_step == 4:
     with col1:
         if st.button("Go Back"):
             prev_step()
-            st.rerun()
 
     with col2:
         if st.button("Check Loan Eligibility"):
@@ -1071,7 +1031,6 @@ elif st.session_state.current_step == 4:
                 st.error("Please fill in all required fields to proceed.")
             else:
                 next_step()
-                st.rerun()
 
 # Step 5: Loan Eligibility
 elif st.session_state.current_step == 5:
@@ -1170,12 +1129,10 @@ elif st.session_state.current_step == 5:
     with col1:
         if st.button("Go Back"):
             prev_step()
-            st.rerun()
 
     with col2:
         if st.button("View Application Summary"):
             next_step()
-            st.rerun()
 
 # Step 6: Application Summary
 elif st.session_state.current_step == 6:
@@ -1263,12 +1220,10 @@ elif st.session_state.current_step == 6:
     with col1:
         if st.button("Go Back"):
             prev_step()
-            st.rerun()
 
     with col2:
         if st.button("Start New Application"):
             reset_app()
-            st.rerun()
 
     # Download application summary
     st.download_button(
@@ -1300,80 +1255,3 @@ elif st.session_state.current_step == 6:
         file_name=f"loan_application_{st.session_state.user_data.get('application_id', 'summary')}.txt",
         mime="text/plain"
     )
-
-# Function to verify face using deepface library
-def verify_face(image_path, reference_encoding=None):
-    """
-    Verify if the face in the image matches the reference encoding.
-
-    Args:
-        image_path (str): Path to the image file
-        reference_encoding (list, optional): Reference face encoding to compare against
-
-    Returns:
-        tuple: (is_valid_face, face_encoding or confidence score)
-    """
-    try:
-        # Analyze the image
-        result = DeepFace.analyze(img_path=image_path, actions=['embedding'])
-
-        if 'embedding' not in result:
-            return False, None  # No face found
-
-        face_encoding = result['embedding']
-
-        if reference_encoding is None:
-            return True, face_encoding  # Return the encoding if no reference provided
-
-        # Compare the face with the reference encoding
-        distance = np.linalg.norm(np.array(reference_encoding) - np.array(face_encoding))
-        is_same_person = distance < 0.6  # Threshold for face verification
-        confidence = 1 - distance  # Confidence score
-
-        return is_same_person, confidence
-
-    except Exception as e:
-        print(f"Error in face verification: {str(e)}")
-        return False, None
-
-# Step 1: Welcome screen
-if st.session_state.current_step == 1:
-    st.markdown("<h2 class='sub-header'>Welcome to Virtual Bank Branch</h2>", unsafe_allow_html=True)
-
-    col1, col2 = st.columns([2, 1])
-
-    with col1:
-        st.markdown("""
-        <div class='info-box'>
-            <p>Welcome to our AI-powered banking experience! I am your virtual Bank Manager, ready to assist you with your loan application process.</p>
-            <p>In this session, we'll go through the following steps:</p>
-            <ol>
-                <li>Identity verification through facial recognition</li>
-                <li>Document submission and verification</li>
-                <li>Video interview for loan assessment</li>
-                <li>Instant loan eligibility check</li>
-            </ol>
-            <p>This process is designed to give you a branch-like experience without visiting a physical bank.</p>
-        </div>
-        """, unsafe_allow_html=True)
-
-        # Collect basic information
-        st.markdown("<p>Let's start with your basic information:</p>", unsafe_allow_html=True)
-        name = st.text_input("Full Name", key="name")
-        email = st.text_input("Email Address", key="email")
-        phone = st.text_input("Phone Number", key="phone")
-
-        if st.button("Begin Application Process"):
-            if not name or not email or not phone:
-                st.error("Please fill in all the fields to continue.")
-            else:
-                # Save user data
-                st.session_state.user_data.update({
-                    "name": name,
-                    "email": email,
-                    "phone": phone,
-                    "application_id": f"LOAN-{int(time.time())}",
-                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S")
-                })
-                next_step()
-                st.rerun()
